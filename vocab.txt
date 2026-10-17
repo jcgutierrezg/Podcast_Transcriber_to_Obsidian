@@ -1,0 +1,9 @@
+# Shared vocabulary - applies to every language.
+# One name or term per line, written exactly how you want it to appear.
+#
+# Two jobs:
+#   1. fed to Whisper as a hint, so it recognises them correctly in the audio
+#   2. used after transcription to force consistent casing and accents
+#
+# Language-specific terms go in vocab.es.txt / vocab.en.txt instead.
+# Keep the combined total under ~40 entries - Whisper's prompt window is small.

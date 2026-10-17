@@ -1,0 +1,3 @@
+# One YouTube URL per line. Lines starting with # are ignored.
+# https://www.youtube.com/watch?v=EXAMPLE1
+# https://www.youtube.com/watch?v=EXAMPLE2

@@ -1,0 +1,35 @@
+[project]
+name = "ytpod"
+version = "0.1.0"
+description = "YouTube podcast -> topic-segmented Obsidian markdown, fully local"
+requires-python = ">=3.10"
+dependencies = [
+    "yt-dlp>=2024.1.0",
+    "faster-whisper>=1.0.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.0",
+    "huggingface-hub>=0.23.0",
+    # CTranslate2 (under faster-whisper) needs these DLLs for GPU support.
+    # Regular dependencies, not an extra: anything outside the default set is
+    # pruned by the next plain `uv sync` / `uv add`, which silently broke the GPU.
+    "nvidia-cublas-cu12; sys_platform != 'darwin'",
+    "nvidia-cudnn-cu12>=9,<10; sys_platform != 'darwin'",
+]
+
+[project.optional-dependencies]
+# Empty alias so `uv sync --extra cuda` from older notes keeps working.
+cuda = []
+
+[project.scripts]
+ytpod = "ytpod.cli:main"
+
+[project.gui-scripts]
+# .venv\Scripts\ytpod-gui.exe opens the window without a console
+ytpod-gui = "ytpod.gui:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ytpod"]

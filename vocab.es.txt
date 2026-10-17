@@ -1,0 +1,3 @@
+# Términos y nombres en español, escritos como quieres que aparezcan.
+# Se usan dos veces: como pista para Whisper, y para forzar mayúsculas/acentos.
+# Se combina con vocab.txt (términos compartidos entre todos los idiomas).

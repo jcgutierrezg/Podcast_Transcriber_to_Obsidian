@@ -1,0 +1,12 @@
+work/
+output/
+vault/
+.venv/
+__pycache__/
+*.pyc
+cookies.txt
+*.cookies
+
+.ytpod-gui.json
+test-vault/
+run.bat

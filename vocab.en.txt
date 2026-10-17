@@ -1,0 +1,3 @@
+# English-only names and terms, cased how you want them.
+# Combined with vocab.txt (shared across all languages).
+
