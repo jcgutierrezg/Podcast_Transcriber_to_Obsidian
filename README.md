@@ -154,8 +154,15 @@ every folder.
 anywhere in the vault by their frontmatter (`id_video` plus the `lang/es` tag),
 not by their folder. A run never forgets a note you dragged into another folder.
 
-If a re-run would write a note under a new name (a different title, date or
-folder), the old one is left alone. ytpod never deletes notes, since one might
+**Filenames are the title alone**, for example `Enseñanza- Juan 14.md`. The
+date is kept only in the frontmatter (`publicado` / `published`), and the index
+is sorted by that date. If a different video already has a note with the same
+title anywhere in the vault, the new one gets its date added, as
+`Introducción (2026-10-11).md`. Without a date, it gets the video's id instead.
+Notes are never overwritten across videos.
+
+If a re-run would write a note under a new name (a different title or folder),
+the old one is left alone. ytpod never deletes notes, since one might
 be your hand-edited copy, and the log names it so you can tidy up.
 
 ## How it works
@@ -166,7 +173,7 @@ be your hand-edited copy, and the log names it so you can tidy up.
 | 2. transcribe | timestamped segments via faster-whisper | `work/<id>/transcript.json` |
 | 2b. clean | seam repair, casing, punctuation | `work/<id>/transcript.clean.json` |
 | 3. segment | topic boundaries via Ollama | `work/<id>/topics.json` |
-| 4. render | Obsidian note | `output/<date> - <title>.md` |
+| 4. render | Obsidian note | `output/<lang>/<title>.md` |
 
 Stages are skipped if their cache exists. `--redo segment` invalidates downstream
 stages only, so you can iterate on prompts and models without re-transcribing.
@@ -311,7 +318,8 @@ copied out of a web player, such as Bunny Stream's
 `playlist.m3u8` request and choose *Copy URL*.
 
 **Name it.** A raw stream carries no title or date, so add them on the same
-line. Both are optional, and the date sets the note's filename and `publicado`:
+line. Both are optional. The title becomes the note's filename, and the date
+goes into its `publicado` field:
 
 ```
 https://vz-....b-cdn.net/.../playlist.m3u8 | Enseñanza: Juan 15 | 2026-10-11

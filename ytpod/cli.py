@@ -116,7 +116,8 @@ def process(entry: Entry, cfg: Config, redo: set[str],
     # The keyword index and hubs stay with the language folder; only the note
     # itself moves into the requested folder (relative to the vault root).
     note_cfg = replace(ep_cfg, out_dir=cfg.out_dir / folder) if folder else ep_cfg
-    path = render_mod.render(meta, segments, topics, note_cfg, language, index)
+    path = render_mod.render(meta, segments, topics, note_cfg, language, index,
+                             vault_root=cfg.out_dir)
     all_kw = sorted({k for t in topics for k in t.get("canonical_keywords", [])})
     kw_mod.register_note(index, all_kw, path.stem)
     kw_mod.save_index(ep_cfg.out_dir, index)

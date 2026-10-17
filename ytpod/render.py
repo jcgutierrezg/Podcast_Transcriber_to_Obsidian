@@ -95,7 +95,8 @@ def _paragraphs_with_starts(segments: list[dict], cfg: Config) -> list[tuple[str
 
 
 def render(meta: dict, segments: list[dict], topics: list[dict], cfg: Config,
-           language: str = "en", index: dict | None = None) -> Path:
+           language: str = "en", index: dict | None = None,
+           vault_root: Path | None = None) -> Path:
     from .lang import profile as get_profile
     from . import keywords as kw
     profile = get_profile(language)
@@ -214,10 +215,24 @@ def render(meta: dict, segments: list[dict], topics: list[dict], cfg: Config,
                 lines.append("")
 
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
-    name = safe_filename(f"{date_iso + ' - ' if date_iso else ''}{meta['title']}") + ".md"
-    path = cfg.out_dir / name
+    path = cfg.out_dir / _note_name(meta, date_iso, vault_root or cfg.out_dir)
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return path
+
+
+def _note_name(meta: dict, date_iso: str, vault_root: Path) -> str:
+    """The title alone - the date lives in the frontmatter. Only if another
+    video's note already has that name (anywhere in the vault: Obsidian links by
+    name) does it get a suffix, the date, or the video id if there is no date."""
+    from . import library
+    name = safe_filename(meta["title"]) + ".md"
+    taken = [p for p in library.notes_named(vault_root, name)
+             if library.video_id_of(p) not in (None, meta["video_id"])]
+    if not taken:
+        return name
+    suffix = date_iso or meta["video_id"]
+    print(f"  note: '{name}' is another video's note; naming this one '... ({suffix})'")
+    return safe_filename(f"{meta['title']} ({suffix})") + ".md"
 
 
 def rebuild_index(out_dir: Path, language: str | None = None,
@@ -231,6 +246,10 @@ def rebuild_index(out_dir: Path, language: str | None = None,
         # Skip any note starting with "_" - that is the index itself, whatever
         # it happens to be called in this language.
         notes = sorted(p for p in out_dir.glob("*.md") if not p.name.startswith("_"))
+    # Filenames no longer start with the date, so order by the frontmatter's
+    # published date (undated notes last, by name).
+    from .library import published_of
+    notes = sorted(notes, key=lambda n: (published_of(n) or "9999", n.stem.lower()))
     # Two copies with one filename in different folders are one [[link]] to Obsidian
     stems = list(dict.fromkeys(n.stem for n in notes))
 

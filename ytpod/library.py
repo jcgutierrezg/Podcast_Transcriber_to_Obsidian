@@ -47,9 +47,30 @@ def episode_notes(root: Path, language: str | None = None) -> list[Path]:
     return sorted(out, key=lambda p: p.name.lower())
 
 
+_PUBLISHED = re.compile(r"^(?:publicado|published):\s*\"?(\d{4}-\d{2}-\d{2})", re.M)
+
+
 def notes_for_video(root: Path, video_id: str) -> list[Path]:
     return [p for p in _markdown_files(root)
             if any(m == video_id for m in _ID_KEY.findall(_frontmatter(p)))]
+
+
+def video_id_of(path: Path) -> str | None:
+    m = _ID_KEY.search(_frontmatter(path))
+    return m.group(1) if m else None
+
+
+def published_of(path: Path) -> str:
+    """The note's published date as YYYY-MM-DD, or "" if it has none."""
+    m = _PUBLISHED.search(_frontmatter(path))
+    return m.group(1) if m else ""
+
+
+def notes_named(root: Path, filename: str) -> list[Path]:
+    """Every note in the vault with this filename. Obsidian links by name alone,
+    so two of them in different folders make [[name]] ambiguous."""
+    want = filename.lower()
+    return [p for p in _markdown_files(root) if p.name.lower() == want]
 
 
 def safe_folder(folder: str) -> str:
