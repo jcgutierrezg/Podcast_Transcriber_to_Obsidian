@@ -96,7 +96,9 @@ def _paragraphs_with_starts(segments: list[dict], cfg: Config) -> list[tuple[str
 
 def render(meta: dict, segments: list[dict], topics: list[dict], cfg: Config,
            language: str = "en", index: dict | None = None,
-           vault_root: Path | None = None) -> Path:
+           vault_root: Path | None = None, condenser=None) -> Path:
+    """Write the note. With a condense.Condenser, each chapter leads with
+    condensed notes and keeps its full transcript in a collapsed callout."""
     from .lang import profile as get_profile
     from . import keywords as kw
     profile = get_profile(language)
@@ -178,7 +180,7 @@ def render(meta: dict, segments: list[dict], topics: list[dict], cfg: Config,
     lines.append("---")
     lines.append("")
 
-    for t in topics:
+    for n, t in enumerate(topics, 1):
         anchor = safe_filename(t["title"])
         lines.append(f"## {anchor}")
         lines.append("")
@@ -194,30 +196,41 @@ def render(meta: dict, segments: list[dict], topics: list[dict], cfg: Config,
             lines.append(f"*{links}*")
             lines.append("")
 
-        chunk = [s for s in segments if t["start"] <= s["start"] < t["end"]]
-
-        if cfg.inline_mark_seconds:
-            # Coarse in-body markers every N seconds. Off by default.
-            next_mark = t["start"] + cfg.inline_mark_seconds
-            elapsed = t["start"]
-            for para, para_start in _paragraphs_with_starts(chunk, cfg):
-                if para_start >= next_mark:
-                    lines.append(f"*{_stamp(para_start, deep)}*")
-                    lines.append("")
-                    while next_mark <= para_start:
-                        next_mark += cfg.inline_mark_seconds
-                lines.append(para)
-                lines.append("")
-                elapsed = para_start
+        body = _topic_lines(t, segments, cfg, deep)
+        if condenser is None:
+            lines += body
         else:
-            for para in _paragraphs(chunk, cfg):
-                lines.append(para)
-                lines.append("")
+            from .condense import chapter_body, paragraphs_of
+            print(f"\r  condensing: chapter {n}/{len(topics)}", end="", flush=True)
+            condensed = condenser.chapter(paragraphs_of(body), profile.code,
+                                          meta["title"], anchor)
+            lines += chapter_body(body, condensed, profile.label("full_transcript"))
+    if condenser is not None and topics:
+        print(f"\r  {condenser.summary()}" + " " * 10)
 
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     path = cfg.out_dir / _note_name(meta, date_iso, vault_root or cfg.out_dir)
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return path
+
+
+def _topic_lines(t: dict, segments: list[dict], cfg: Config, deep: str | None) -> list[str]:
+    """One chapter's transcript as paragraph lines, blank-line separated."""
+    chunk = [s for s in segments if t["start"] <= s["start"] < t["end"]]
+    lines: list[str] = []
+    if cfg.inline_mark_seconds:
+        # Coarse in-body markers every N seconds. Off by default.
+        next_mark = t["start"] + cfg.inline_mark_seconds
+        for para, para_start in _paragraphs_with_starts(chunk, cfg):
+            if para_start >= next_mark:
+                lines += [f"*{_stamp(para_start, deep)}*", ""]
+                while next_mark <= para_start:
+                    next_mark += cfg.inline_mark_seconds
+            lines += [para, ""]
+    else:
+        for para in _paragraphs(chunk, cfg):
+            lines += [para, ""]
+    return lines
 
 
 def _note_name(meta: dict, date_iso: str, vault_root: Path) -> str:

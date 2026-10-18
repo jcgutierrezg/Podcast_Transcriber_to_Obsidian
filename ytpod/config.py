@@ -78,6 +78,24 @@ class Config:
     overlap_minutes: int = 3               # overlap so topics spanning a window edge survive
     min_topic_seconds: int = 150           # merge anything shorter than this into its neighbour
 
+    # --- condensing (optional stage 5) ---
+    # Each chapter rewritten as condensed study notes, with the full transcript
+    # kept below it in a collapsed callout. Enable with --condense.
+    condense: bool = False
+    condense_chunk_words: int = 800    # words per LLM request
+    condense_min_words: int = 80       # shorter chapters are already short: left as-is
+    # qwen3 must reason before it condenses well (with thinking off it narrates
+    # its reasoning into the answer, or copies the text). Reasoning needs room:
+    # ~1.2k tokens in, up to ~4k thinking, the notes after. 8k context for
+    # qwen3:4b is ~3.9 GB, still all on a 6 GB card.
+    condense_num_ctx: int = 8192
+    condense_num_predict: int = 6000
+    # Model for condensing; None = same as llm_model. The non-thinking instruct
+    # build answers directly: on a 14-min class, 31 s and 39% length with no
+    # failures, against 12 min and frequent failures for qwen3:4b, which has to
+    # reason first. Install with: ollama pull qwen3:4b-instruct-2507-q4_K_M
+    condense_model: str | None = "qwen3:4b-instruct-2507-q4_K_M"
+
     # --- rendering (stage 4) ---
     inline_mark_seconds: int = 0           # 0 = off. Set to e.g. 300 for a [mm:ss] every 5 min.
     paragraph_gap_seconds: float = 1.6     # silence longer than this starts a new paragraph

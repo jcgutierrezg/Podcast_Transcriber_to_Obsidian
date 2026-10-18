@@ -33,6 +33,12 @@ Install Ollama from ollama.com, then:
 ollama pull qwen3:4b
 ```
 
+For condensed chapters (optional), also:
+
+```powershell
+ollama pull qwen3:4b-instruct-2507-q4_K_M
+```
+
 On a sub-8 GB card `qwen3:4b` at 16k context is the safe choice. If you have
 headroom, `qwen3:8b` gives noticeably better topic titles — pass `--llm qwen3:8b`.
 Check what you actually have with `ollama list`.
@@ -64,6 +70,9 @@ desktop, for one-click launching.
     *Cleanup + topics* applies vocab edits, *Everything* transcribes again.
   - **Topics from**: the AI, or a YouTube video's own chapters.
   - **AI model**: any model Ollama has installed. The dropdown lists them.
+  - **Condense chapters**: condensed notes first, full transcript collapsed
+    (see "Condensed chapters").
+- **Condense existing notes...** applies the same to notes already in the vault.
 - **Vocabulary** tab: edits the selected vault's own vocab files (see below).
 - **Run** streams the log live. **Stop** ends the whole run, including
   transcription, so the GPU is freed. **Check setup** runs `--doctor`.
@@ -164,6 +173,80 @@ Notes are never overwritten across videos.
 If a re-run would write a note under a new name (a different title or folder),
 the old one is left alone. ytpod never deletes notes, since one might
 be your hand-edited copy, and the log names it so you can tidy up.
+
+## Condensed chapters
+
+Turn on **Condense chapters** in the app (`--condense` on the command line), and
+each chapter leads with condensed study notes. The fillers, greetings and
+repetition are gone, and every idea, example, name, number and reference (Bible
+verses, books, tools) stays. The full transcript is still there, collapsed at
+the end of the chapter:
+
+```markdown
+## Cómo organizar el estudio
+`00:03:05` – `00:06:11`
+
+- Cada módulo empieza con una visión general antes de entrar en detalle.
+- El material escrito se entrega al final; leerlo antes hace perder el hilo.
+- Orden recomendado: ver los vídeos primero, después repasar el documento.
+
+> [!quote]- Transcripción completa
+> Bueno, eh, antes de empezar con el primer módulo, quería comentaros...
+```
+
+Click the box to expand it. It runs on the same local Ollama model as topic
+segmentation, and nothing leaves your machine.
+
+**Notes you already have.** *Condense existing notes...* in the app, or:
+
+```powershell
+uv run ytpod --condense-notes "D:\Vaults\Curso\Módulo 1"            # a folder
+uv run ytpod --condense-notes "D:\Vaults\Curso\es\Lección 1.md"     # or notes
+```
+
+- **It condenses the note itself**, not the cache. Edits you made to a
+  transcript are what get condensed, and it works on notes made on another
+  machine.
+- **Re-running is safe.** An already-condensed chapter is re-condensed from its
+  collapsed original, so summaries never stack. Results are cached in
+  `work/_condense/`, so re-running costs nothing for chapters that haven't changed.
+- **A backup comes first.** Each note's previous version is saved as
+  `<vault>\.ytpod\backups\<name>.<time>.md.bak`. That folder is hidden from
+  Obsidian, and the `.bak` extension keeps backups from ever being read as
+  notes, so they never appear in search, the graph or backlinks. Rename one to
+  `.md` to restore it.
+- Only chapters are touched: sections that start with a timestamp line. The
+  contents list and any sections you added yourself are left alone, as are
+  chapters under ~80 words, which are already short.
+
+**Which model.** Condensing uses `qwen3:4b-instruct-2507-q4_K_M` by default, a
+non-thinking build of the same model, which answers directly. Install it once:
+
+```powershell
+ollama pull qwen3:4b-instruct-2507-q4_K_M
+```
+
+Topic segmentation keeps using the main AI model (`qwen3:4b`). Measured on the
+same 14-minute class:
+
+| Condense model | Time | Length | Failed pieces |
+|---|---|---|---|
+| `qwen3:4b-instruct-2507-q4_K_M` | 31 s | 39% | 0 of 5 |
+| `qwen3:4b` | 12 min | 81% | 4 of 5 |
+
+`qwen3:4b` has to reason before it condenses at all. With reasoning off, it
+narrates its thinking into the answer or copies the text back, and with
+reasoning on, it often runs out of room. To use a different model, pick one
+under *Condense with* in the app, or pass `--condense-model`. Either way it runs
+at an 8k context (~3.9 GB, all on a 6 GB GPU).
+
+A 4B model sometimes repeats a point, makes a typo, or blurs a structure
+slightly. That's why the full transcript stays one click away below each chapter.
+
+If a piece comes back empty, isn't shorter than the original, or is the model
+thinking aloud in English over a Spanish text, it's retried once. Failing that,
+the original text is kept for that piece and the log says so. Nothing is ever
+lost, and the next run tries that piece again.
 
 ## How it works
 

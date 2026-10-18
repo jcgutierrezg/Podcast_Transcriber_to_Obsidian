@@ -116,8 +116,14 @@ def process(entry: Entry, cfg: Config, redo: set[str],
     # The keyword index and hubs stay with the language folder; only the note
     # itself moves into the requested folder (relative to the vault root).
     note_cfg = replace(ep_cfg, out_dir=cfg.out_dir / folder) if folder else ep_cfg
+    condenser = None
+    if cfg.condense:
+        from .condense import Condenser, condense_model
+        # topics may be cached, so Ollama hasn't been checked; condensing needs it
+        segment_mod.check_ollama(replace(cfg, llm_model=condense_model(cfg)))
+        condenser = Condenser(cfg)
     path = render_mod.render(meta, segments, topics, note_cfg, language, index,
-                             vault_root=cfg.out_dir)
+                             vault_root=cfg.out_dir, condenser=condenser)
     all_kw = sorted({k for t in topics for k in t.get("canonical_keywords", [])})
     kw_mod.register_note(index, all_kw, path.stem)
     kw_mod.save_index(ep_cfg.out_dir, index)
@@ -177,6 +183,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--yt-chapters", action="store_true",
                    help="use the uploader's own chapters instead of the LLM")
     p.add_argument("--keep-audio", action="store_true", help="don't delete audio when done")
+    p.add_argument("--condense", action="store_true",
+                   help="lead each chapter with condensed notes; the full transcript "
+                        "stays below, collapsed")
+    p.add_argument("--condense-model", metavar="TAG",
+                   help="Ollama model for condensing (default: the --llm model). "
+                        "A non-thinking instruct model is much faster.")
+    p.add_argument("--condense-notes", nargs="+", type=Path, metavar="NOTE",
+                   help="condense notes already written (files, or folders to search), "
+                        "then exit. Backs each note up to <vault>/.ytpod/backups first.")
     single = p.add_argument_group(
         "single episode", "Name one episode without the '|' syntax (one URL only).")
     single.add_argument("--title", help="note title (default: the video's own)")
@@ -216,9 +231,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.no_repunctuate:
         cfg.restore_punctuation = False
 
+    if args.condense:
+        cfg.condense = True
+    if args.condense_model:
+        cfg.condense_model = args.condense_model
+
     if args.doctor:
         from .doctor import doctor
         return doctor(cfg)
+
+    if args.condense_notes:
+        from .condense import condense_notes
+        cfg.work_dir = cfg.work_dir.resolve()
+        try:
+            return condense_notes(args.condense_notes, cfg)
+        except RuntimeError as exc:   # Ollama down or model missing: say so plainly
+            print(f"FAILED: {exc}")
+            return 1
 
     if not args.sources:
         p.error("a URL or .txt file is required (or use --doctor)")

@@ -163,6 +163,9 @@ class App:
         self.run_btn.pack(side="right", padx=(0, 6))
         self.doctor_btn = ttk.Button(bar, text="Check setup", command=self.doctor)
         self.doctor_btn.pack(side="right", padx=(0, 6))
+        self.condense_btn = ttk.Button(bar, text="Condense existing notes...",
+                                       command=self.condense_existing)
+        self.condense_btn.pack(side="right", padx=(0, 6))
 
         self.on_mode_changed()
         self.on_vault_changed()
@@ -241,7 +244,24 @@ class App:
         self.llm_var = tk.StringVar(value=self.settings.get("llm") or Config().llm_model)
         self.llm_box = ttk.Combobox(f, textvariable=self.llm_var, width=26)
         self.llm_box.grid(row=1, column=3, sticky="w", padx=(6, 18), pady=(6, 0))
+
+        self.condense_var = tk.BooleanVar(value=bool(self.settings.get("condense", False)))
+        ttk.Checkbutton(f, text="Condense chapters (condensed notes first, full "
+                                "transcript collapsed below)",
+                        variable=self.condense_var).grid(row=2, column=0, columnspan=2,
+                                                         sticky="w", pady=(6, 0))
+        ttk.Label(f, text="Condense with").grid(row=2, column=2, sticky="w", pady=(6, 0))
+        self.condense_model_var = tk.StringVar(value=self.settings.get("condense_model", ""))
+        self.condense_model_box = ttk.Combobox(f, textvariable=self.condense_model_var, width=26)
+        self.condense_model_box.grid(row=2, column=3, sticky="w", padx=(6, 18), pady=(6, 0))
+        ttk.Label(f, text=f"Blank = {Config().condense_model or Config().llm_model} "
+                          "(a fast non-thinking model, ~30 s per 15-min video).",
+                  foreground="gray").grid(row=3, column=0, columnspan=4, sticky="w")
         return f
+
+    def _condense_model_args(self) -> list[str]:
+        model = self.condense_model_var.get().strip()
+        return ["--condense-model", model] if model else []
 
     def on_mode_changed(self) -> None:
         single = self.mode_var.get() == "single"
@@ -335,6 +355,8 @@ class App:
         self.settings["last_vault"] = key
         self.settings["vaults"].setdefault(key, {})["lang"] = self.lang_var.get()
         self.settings["llm"] = self.llm_var.get().strip()
+        self.settings["condense"] = bool(self.condense_var.get())
+        self.settings["condense_model"] = self.condense_model_var.get().strip()
         self.vault_box["values"] = self.settings["recent"]
         _save_settings(self.settings)
 
@@ -435,6 +457,8 @@ class App:
         args += TOPIC_SOURCES[self.topics_box.current()][1]
         if self.llm_var.get().strip():
             args += ["--llm", self.llm_var.get().strip()]
+        if self.condense_var.get():
+            args += ["--condense", *self._condense_model_args()]
         self._start(args, label)
 
     def _single_args(self) -> list[str] | None:
@@ -474,6 +498,31 @@ class App:
 
     def doctor(self) -> None:
         self._start(["--doctor"], "Checking setup")
+
+    def condense_existing(self) -> None:
+        """Pick notes already in the vault and condense them in place."""
+        vault = self.vault()
+        if vault is None or not vault.is_dir():
+            messagebox.showwarning("ytpod", "Choose the vault first.")
+            return
+        files = filedialog.askopenfilenames(
+            title="Notes to condense", initialdir=str(vault),
+            filetypes=[("Markdown notes", "*.md")])
+        if not files:
+            return
+        if not messagebox.askokcancel(
+                "ytpod",
+                f"Condense {len(files)} note(s) in place?\n\n"
+                "Each chapter gets condensed notes first, with the full transcript kept "
+                "below it, collapsed. A backup of each note is saved in the vault's "
+                ".ytpod/backups folder first (hidden from Obsidian)."):
+            return
+        self._remember_vault(vault)
+        args = ["--condense-notes", *files]
+        if self.llm_var.get().strip():
+            args += ["--llm", self.llm_var.get().strip()]
+        args += self._condense_model_args()
+        self._start(args, f"Condensing {len(files)} note(s)")
 
     def _start(self, args: list[str], label: str) -> None:
         if self.proc:
@@ -541,12 +590,14 @@ class App:
             pass
         if self._llm_names is not None:
             self.llm_box.configure(values=self._llm_names)
+            self.condense_model_box.configure(values=["", *self._llm_names])
             self._llm_names = None
         self.root.after(50, self._drain)
 
     def _set_running(self, running: bool, label: str) -> None:
         self.run_btn.config(state="disabled" if running else "normal")
         self.doctor_btn.config(state="disabled" if running else "normal")
+        self.condense_btn.config(state="disabled" if running else "normal")
         self.stop_btn.config(state="normal" if running else "disabled")
         self.status.config(text=label)
 
@@ -588,6 +639,8 @@ class App:
             return
         self.stop()
         self.settings["llm"] = self.llm_var.get().strip()
+        self.settings["condense"] = bool(self.condense_var.get())
+        self.settings["condense_model"] = self.condense_model_var.get().strip()
         _save_settings(self.settings)  # mode and model choice
         self.root.destroy()
 
